@@ -1,24 +1,43 @@
-name: Release
+name: Build & Release — fileweaver (AWS Lambda)
 
+# Manual-only. Trigger from the Actions tab when you want a new build to
+# hit Lambda. Same safety pattern as ClickAndCare: you must type "release"
+# into the confirm input before the job will run.
+#
+# Env vars (MONGODB_URI, REPORT_ADMIN_KEY, etc.) come from Doppler at deploy
+# time via `doppler run`. Only AWS credentials and the Doppler service token
+# live in GitHub secrets.
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: 'Deployment stage (e.g. production, staging)'
+        description: 'Serverless stage to deploy to'
         required: true
         default: 'production'
         type: choice
         options:
           - production
           - staging
+      confirm:
+        description: 'Type "release" to confirm'
+        required: true
+        default: ''
+
+concurrency:
+  group: release-fileweaver-${{ inputs.stage }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Build & deploy
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
+    # Safety rail: user has to type "release" exactly in the input.
+    if: ${{ inputs.confirm == 'release' }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION || 'ap-south-1' }}
+      # Doppler service token scoped to fileweaver-be / <stage>
+      DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +46,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -35,15 +54,17 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
       - name: Build shadow jar
-        run: ./gradlew shadowJar
+        run: ./gradlew shadowJar --no-daemon
 
-      - name: Set up Node (for serverless)
+      - name: Set up Node (for Serverless Framework)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
 
       - name: Install Serverless Framework
         run: npm install -g serverless@3
@@ -51,12 +72,8 @@ jobs:
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@v3
 
-      - name: Deploy
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-        run: |
-          doppler run --config=fileweaver-be/${{ inputs.stage }} -- \
-            serverless deploy --stage ${{ inputs.stage }}
+      - name: Build & Release (stage=${{ inputs.stage }})
+        # --preserve-env keeps AWS_* from the GH env intact while injecting
+        # MONGODB_URI / REPORT_ADMIN_KEY / etc. from Doppler. Serverless then
+        # reads them via ${env:VAR} in serverless.yml.
+        run: doppler run --preserve-env -- serverless deploy --stage ${{ inputs.stage }} --verbose

@@ -69,11 +69,28 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Spring Boot's plugin replaces the standard `jar` task with `bootJar`,
+// which produces an executable jar with classes nested under
+// BOOT-INF/classes/. AWS Lambda's URLClassLoader can't see classes inside
+// BOOT-INF, so we disable bootJar entirely and have shadow build a plain
+// fat jar directly from sourceSets + runtime classpath. This matches what
+// the local build produces and stops CI from drifting.
+tasks.bootJar {
+    enabled = false
+}
+
+tasks.jar {
+    enabled = true
+    archiveClassifier.set("plain")
+}
+
 tasks.shadowJar {
     archiveClassifier.set("aws")
     archiveBaseName.set("fileweaver")
     archiveVersion.set("")
     mergeServiceFiles()
+    from(sourceSets.main.get().output)
+    configurations = listOf(project.configurations.runtimeClasspath.get())
 }
 
 tasks.build {

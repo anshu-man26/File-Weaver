@@ -117,6 +117,18 @@ resources:
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching
 
+  # API Gateway HTTP API stage-level throttling. Serverless Framework
+  # auto-creates the HttpApiStage resource — we extend it instead of
+  # redefining (which would conflict with the rest of the wire-up).
+  # Numbers are conservative for a personal project: 429 responses kick
+  # in at ~10 sustained req/sec, allowing short 20 req/sec bursts.
+  extensions:
+    HttpApiStage:
+      Properties:
+        DefaultRouteSettings:
+          ThrottlingBurstLimit: 20
+          ThrottlingRateLimit: 10
+
 # Use the shadow fat jar AS the deployment artifact — Lambda extracts a
 # .jar (which is a zip) directly into /var/task/, so our compiled .class
 # files land on the classpath. The previous `patterns:` approach put the

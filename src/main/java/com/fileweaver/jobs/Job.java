@@ -27,6 +27,8 @@ public class Job {
     private String s3Bucket;
     private String contentType;
     private Long byteSize;
+    /** Optional human-friendly filename for the Content-Disposition header. */
+    private String downloadFilename;
 
     private JobError error;
     private int attempts;
@@ -98,6 +100,9 @@ public class Job {
 
     public Long getByteSize() { return byteSize; }
     public void setByteSize(Long byteSize) { this.byteSize = byteSize; }
+
+    public String getDownloadFilename() { return downloadFilename; }
+    public void setDownloadFilename(String downloadFilename) { this.downloadFilename = downloadFilename; }
 
     public JobError getError() { return error; }
     public void setError(JobError error) { this.error = error; }

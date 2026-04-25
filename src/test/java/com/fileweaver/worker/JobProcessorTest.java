@@ -58,7 +58,7 @@ class JobProcessorTest {
         processor.process("J1");
 
         verify(s3).upload(anyString(), any(byte[].class), eq("text/csv"));
-        verify(jobs).markCompleted(eq("J1"), anyString(), eq("text/csv"), anyLong());
+        verify(jobs).markCompleted(eq("J1"), anyString(), eq("text/csv"), anyLong(), any());
         verify(jobs, never()).markFailed(any(), any(), any());
     }
 
@@ -105,7 +105,7 @@ class JobProcessorTest {
         when(jobs.tryClaim("J1")).thenReturn(Optional.empty());
         processor.process("J1");
         verify(s3, never()).upload(any(), any(), any());
-        verify(jobs, never()).markCompleted(any(), any(), any(), anyLong());
+        verify(jobs, never()).markCompleted(any(), any(), any(), anyLong(), any());
         verify(jobs, never()).markFailed(any(), any(), any());
     }
 

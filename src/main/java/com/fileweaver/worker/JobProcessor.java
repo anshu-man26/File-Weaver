@@ -58,7 +58,15 @@ public class JobProcessor {
                 LocalDate.now(), jobId, out.fileExtension());
             s3.upload(s3Key, out.bytes(), out.contentType());
 
-            jobs.markCompleted(jobId, s3Key, out.contentType(), out.bytes().length);
+            // Reports may suggest a human-friendly filename via metadata.
+            // Falls back to the s3 key's basename when absent.
+            String suggestedFilename = null;
+            if (data.metadata() != null) {
+                Object fn = data.metadata().get("downloadFilename");
+                if (fn instanceof String s && !s.isBlank()) suggestedFilename = s;
+            }
+
+            jobs.markCompleted(jobId, s3Key, out.contentType(), out.bytes().length, suggestedFilename);
             log.info("Job {} completed, {} bytes uploaded to {}", jobId, out.bytes().length, s3Key);
 
         } catch (RetryableException e) {

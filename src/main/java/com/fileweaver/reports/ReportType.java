@@ -4,5 +4,6 @@ public enum ReportType {
     INVOICE,
     TAX_SUMMARY,
     APPOINTMENT_LOG,
+    APPOINTMENT_RECEIPT,
     USER_ACTIVITY
 }

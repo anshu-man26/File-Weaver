@@ -6,6 +6,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import jakarta.annotation.PreDestroy;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Sort;
@@ -53,6 +54,13 @@ public class ClickAndCareGateway {
         Query q = Query.query(Criteria.where("userId").is(userId))
             .with(Sort.by(Sort.Direction.DESC, "date"));
         return template.find(q, Document.class, "appointments");
+    }
+
+    /** Single appointment by its 24-char hex ObjectId. Null if not found. */
+    public Document findAppointmentById(String id) {
+        if (id == null || !ObjectId.isValid(id)) return null;
+        Query q = Query.query(Criteria.where("_id").is(new ObjectId(id)));
+        return template.findOne(q, Document.class, "appointments");
     }
 
     @PreDestroy

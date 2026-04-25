@@ -66,7 +66,7 @@ public class JobService {
         return repo.findById(jobId);
     }
 
-    public void markCompleted(String jobId, String s3Key, String contentType, long byteSize) {
+    public void markCompleted(String jobId, String s3Key, String contentType, long byteSize, String downloadFilename) {
         Instant now = Instant.now();
         Update u = new Update()
             .set("status", JobStatus.COMPLETED)
@@ -76,6 +76,9 @@ public class JobService {
             .set("byteSize", byteSize)
             .set("completedAt", now)
             .set("updatedAt", now);
+        if (downloadFilename != null && !downloadFilename.isBlank()) {
+            u.set("downloadFilename", downloadFilename);
+        }
         mongo.updateFirst(Query.query(Criteria.where("_id").is(jobId)), u, Job.class);
     }
 

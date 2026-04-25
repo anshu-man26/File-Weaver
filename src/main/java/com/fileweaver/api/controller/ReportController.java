@@ -121,7 +121,7 @@ public class ReportController {
         if (job.getStatus() != JobStatus.COMPLETED || job.getS3Key() == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Job not yet completed");
         }
-        PresignedUrl url = s3.presignDownload(job.getS3Key(), downloadTtl);
+        PresignedUrl url = s3.presignDownload(job.getS3Key(), downloadTtl, job.getDownloadFilename());
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(url.url()))
             .build();
@@ -129,7 +129,7 @@ public class ReportController {
 
     private JobResponse decorate(JobResponse base, Job job) {
         if (job.getStatus() == JobStatus.COMPLETED && job.getS3Key() != null) {
-            PresignedUrl url = s3.presignDownload(job.getS3Key(), downloadTtl);
+            PresignedUrl url = s3.presignDownload(job.getS3Key(), downloadTtl, job.getDownloadFilename());
             return base.withDownload(url.url(), url.expiresAt());
         }
         return base;

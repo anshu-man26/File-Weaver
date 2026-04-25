@@ -33,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @RestController
@@ -73,9 +74,16 @@ public class ReportController {
         writers.resolve(req.getFormat());
         report.validate(req.getPayload());
 
-        String idemKey = idempotency.compute(req.getType(), req.getFormat(), req.getPayload());
-
-        if (!req.isForceRegenerate()) {
+        String idemKey;
+        if (req.isForceRegenerate()) {
+            // Caller explicitly wants a fresh job. Make the idempotency key
+            // unique so we never collide with the existing record (and don't
+            // pollute future lookups for that payload — those still hash
+            // deterministically).
+            idemKey = "force-" + UUID.randomUUID() + "-" + HexFormat.of().formatHex(
+                Long.toHexString(Instant.now().toEpochMilli()).getBytes());
+        } else {
+            idemKey = idempotency.compute(req.getType(), req.getFormat(), req.getPayload());
             var existing = jobs.findByIdempotencyKey(idemKey);
             if (existing.isPresent()) {
                 Job hit = existing.get();

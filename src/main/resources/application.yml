@@ -29,6 +29,10 @@ app:
     cache-ttl: PT5M
   idempotency:
     bucket-by-day: true
+  # Optional secondary Mongo connection used by APPOINTMENT_LOG to read
+  # straight from ClickAndCare's database. Leave empty to disable.
+  clickandcare:
+    mongodb-uri: ${CLICKANDCARE_MONGODB_URI:}
 
 logging:
   level:

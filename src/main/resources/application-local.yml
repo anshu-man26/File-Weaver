@@ -27,6 +27,10 @@ app:
     secret-key: test
   auth:
     admin-key: localdev-master
+  clickandcare:
+    # Local dev: uncomment + point at a local Mongo with seeded data,
+    # or set CLICKANDCARE_MONGODB_URI env var to override.
+    mongodb-uri: ${CLICKANDCARE_MONGODB_URI:}
 
 logging:
   level:

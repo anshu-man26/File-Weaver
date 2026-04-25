@@ -15,6 +15,10 @@ provider:
     REPORT_ADMIN_KEY: ${env:REPORT_ADMIN_KEY}
     SQS_QUEUE_NAME: ${self:service}-${self:provider.stage}-jobs
     S3_BUCKET: ${self:service}-${self:provider.stage}-files
+    # Optional: connection string for ClickAndCare's MongoDB (used by the
+    # APPOINTMENT_LOG report to read appointments directly). Empty string
+    # disables the secondary connection cleanly.
+    CLICKANDCARE_MONGODB_URI: ${env:CLICKANDCARE_MONGODB_URI, ''}
     # AWS_REGION is auto-injected by the Lambda runtime — setting it here
     # would trigger "reserved key" rejection at deploy time.
   iam:

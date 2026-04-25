@@ -13,6 +13,8 @@ app:
     endpoint: ""
   auth:
     admin-key: ${REPORT_ADMIN_KEY}
+  clickandcare:
+    mongodb-uri: ${CLICKANDCARE_MONGODB_URI:}
 
 logging:
   level:

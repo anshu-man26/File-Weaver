@@ -1,0 +1,39 @@
+# Build
+build/
+.gradle/
+out/
+bin/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+.env.local
+.doppler/
+*.local
+
+# Serverless
+.serverless/
+node_modules/
+package-lock.json
+package.json
+
+# Logs
+*.log
+logs/
+
+# Test results
+test-output/
+.junit/

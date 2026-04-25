@@ -1,0 +1,154 @@
+package com.fileweaver.api.controller;
+
+import com.fileweaver.api.dto.CreateReportRequest;
+import com.fileweaver.api.dto.JobResponse;
+import com.fileweaver.auth.ApiKey;
+import com.fileweaver.auth.AuthenticatedKey;
+import com.fileweaver.jobs.IdempotencyService;
+import com.fileweaver.jobs.Job;
+import com.fileweaver.jobs.JobService;
+import com.fileweaver.jobs.JobStatus;
+import com.fileweaver.queue.JobMessage;
+import com.fileweaver.queue.QueueClient;
+import com.fileweaver.reports.Report;
+import com.fileweaver.reports.ReportRegistry;
+import com.fileweaver.storage.PresignedUrl;
+import com.fileweaver.storage.S3Uploader;
+import com.fileweaver.writers.WriterFactory;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/reports")
+public class ReportController {
+
+    private static final Logger log = LoggerFactory.getLogger(ReportController.class);
+
+    private final JobService jobs;
+    private final ReportRegistry reports;
+    private final WriterFactory writers;
+    private final IdempotencyService idempotency;
+    private final QueueClient queue;
+    private final S3Uploader s3;
+
+    @Value("${app.s3.download-url-ttl:PT15M}")
+    private Duration downloadTtl;
+
+    public ReportController(JobService jobs,
+                            ReportRegistry reports,
+                            WriterFactory writers,
+                            IdempotencyService idempotency,
+                            QueueClient queue,
+                            S3Uploader s3) {
+        this.jobs = jobs;
+        this.reports = reports;
+        this.writers = writers;
+        this.idempotency = idempotency;
+        this.queue = queue;
+        this.s3 = s3;
+    }
+
+    @PostMapping
+    public ResponseEntity<JobResponse> create(@Valid @RequestBody CreateReportRequest req,
+                                              @AuthenticatedKey ApiKey caller) {
+        // fail-fast on unknown type / unsupported format / bad payload (returns 400)
+        Report report = reports.resolve(req.getType());
+        writers.resolve(req.getFormat());
+        report.validate(req.getPayload());
+
+        String idemKey = idempotency.compute(req.getType(), req.getFormat(), req.getPayload());
+
+        if (!req.isForceRegenerate()) {
+            var existing = jobs.findByIdempotencyKey(idemKey);
+            if (existing.isPresent()) {
+                Job hit = existing.get();
+                return ResponseEntity.ok(decorate(JobResponse.from(hit, true), hit));
+            }
+        }
+
+        Job job = newJob(req, idemKey, caller);
+        try {
+            jobs.insert(job);
+        } catch (DuplicateKeyException race) {
+            // Lost the insert race — read the winner and return idempotent response
+            Job winner = jobs.findByIdempotencyKey(idemKey).orElseThrow(() ->
+                new IllegalStateException("Duplicate key but no winning job"));
+            return ResponseEntity.ok(decorate(JobResponse.from(winner, true), winner));
+        }
+        queue.enqueue(new JobMessage(job.getId()));
+
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(JobResponse.from(job, false));
+    }
+
+    @GetMapping("/{jobId}")
+    public JobResponse get(@PathVariable String jobId, @AuthenticatedKey ApiKey caller) {
+        Job job = jobs.findById(jobId).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        authorize(job, caller);
+        return decorate(JobResponse.from(job), job);
+    }
+
+    @GetMapping("/{jobId}/download")
+    public ResponseEntity<Void> download(@PathVariable String jobId, @AuthenticatedKey ApiKey caller) {
+        Job job = jobs.findById(jobId).orElseThrow(() ->
+            new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
+        authorize(job, caller);
+        if (job.getStatus() != JobStatus.COMPLETED || job.getS3Key() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Job not yet completed");
+        }
+        PresignedUrl url = s3.presignDownload(job.getS3Key(), downloadTtl);
+        return ResponseEntity.status(HttpStatus.FOUND)
+            .location(URI.create(url.url()))
+            .build();
+    }
+
+    private JobResponse decorate(JobResponse base, Job job) {
+        if (job.getStatus() == JobStatus.COMPLETED && job.getS3Key() != null) {
+            PresignedUrl url = s3.presignDownload(job.getS3Key(), downloadTtl);
+            return base.withDownload(url.url(), url.expiresAt());
+        }
+        return base;
+    }
+
+    private void authorize(Job job, ApiKey caller) {
+        if (caller.getScopes() != null && caller.getScopes().contains("admin")) return;
+        var rb = job.getRequestedBy();
+        if (rb == null || !caller.getId().equals(rb.getApiKeyId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Job belongs to a different API key");
+        }
+    }
+
+    private Job newJob(CreateReportRequest req, String idemKey, ApiKey caller) {
+        Job j = new Job();
+        j.setId(UUID.randomUUID().toString());
+        j.setIdempotencyKey(idemKey);
+        j.setType(req.getType());
+        j.setFormat(req.getFormat());
+        j.setPayload(req.getPayload());
+        j.setStatus(JobStatus.QUEUED);
+        j.setAttempts(0);
+        j.setRequestedBy(new Job.RequestedBy(caller.getName(), caller.getId()));
+        Instant now = Instant.now();
+        j.setCreatedAt(now);
+        j.setUpdatedAt(now);
+        return j;
+    }
+}

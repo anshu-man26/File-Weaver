@@ -1,0 +1,119 @@
+service: fileweaver
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: java21
+  region: ${env:AWS_REGION, 'ap-south-1'}
+  stage: ${opt:stage, 'production'}
+  memorySize: 1024
+  timeout: 29
+  logRetentionInDays: 14
+  environment:
+    SPRING_PROFILES_ACTIVE: lambda
+    MONGODB_URI: ${env:MONGODB_URI}
+    REPORT_ADMIN_KEY: ${env:REPORT_ADMIN_KEY}
+    SQS_QUEUE_NAME: ${self:service}-${self:provider.stage}-jobs
+    S3_BUCKET: ${self:service}-${self:provider.stage}-files
+    AWS_REGION: ${env:AWS_REGION, 'ap-south-1'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+            - s3:HeadBucket
+          Resource:
+            - !Sub "arn:aws:s3:::${self:service}-${self:provider.stage}-files"
+            - !Sub "arn:aws:s3:::${self:service}-${self:provider.stage}-files/*"
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+            - sqs:GetQueueUrl
+            - sqs:ChangeMessageVisibility
+          Resource: !GetAtt ReportJobsQueue.Arn
+  httpApi:
+    cors: true
+
+functions:
+  api:
+    handler: com.fileweaver.api.lambda.ApiGatewayLambdaHandler
+    snapStart: true
+    events:
+      - httpApi: '*'
+
+  worker:
+    handler: com.fileweaver.worker.lambda.SqsLambdaHandler
+    snapStart: true
+    timeout: 300
+    memorySize: 2048
+    events:
+      - sqs:
+          arn: !GetAtt ReportJobsQueue.Arn
+          batchSize: 1
+          functionResponseType: ReportBatchItemFailures
+
+resources:
+  Resources:
+    ReportsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-${self:provider.stage}-files
+        LifecycleConfiguration:
+          Rules:
+            - Id: ExpireOldReports
+              Status: Enabled
+              ExpirationInDays: 90
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+    ReportJobsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-jobs
+        VisibilityTimeout: 600
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt ReportJobsDlq.Arn
+          maxReceiveCount: 3
+
+    ReportJobsDlq:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-jobs-dlq
+        MessageRetentionPeriod: 1209600
+
+    DlqDepthAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-dlq-depth
+        AlarmDescription: A message landed in the report-service DLQ.
+        Namespace: AWS/SQS
+        MetricName: ApproximateNumberOfMessagesVisible
+        Dimensions:
+          - Name: QueueName
+            Value: !GetAtt ReportJobsDlq.QueueName
+        Statistic: Maximum
+        Period: 60
+        EvaluationPeriods: 1
+        Threshold: 0
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+
+package:
+  individually: false
+  excludeDevDependencies: true
+  patterns:
+    - '!**'
+    - 'build/libs/fileweaver-aws.jar'
+
+custom:
+  shadowJar:
+    enabled: true

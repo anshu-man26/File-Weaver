@@ -1,0 +1,19 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+
+app:
+  queue:
+    name: ${SQS_QUEUE_NAME}
+  s3:
+    bucket: ${S3_BUCKET}
+  aws:
+    region: ${AWS_REGION}
+    endpoint: ""
+  auth:
+    admin-key: ${REPORT_ADMIN_KEY}
+
+logging:
+  level:
+    com.fileweaver: INFO

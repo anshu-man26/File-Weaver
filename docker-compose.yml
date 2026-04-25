@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: fileweaver-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: fileweaver-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3,sqs
+      DEFAULT_REGION: us-east-1
+      DEBUG: 0
+    volumes:
+      - localstack-data:/var/lib/localstack
+
+volumes:
+  mongo-data:
+  localstack-data:

@@ -1,0 +1,33 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/fileweaver
+      database: fileweaver
+  cloud:
+    aws:
+      region:
+        static: us-east-1
+      credentials:
+        access-key: test
+        secret-key: test
+      sqs:
+        endpoint: http://localhost:4566
+      s3:
+        endpoint: http://localhost:4566
+
+app:
+  queue:
+    name: fileweaver-jobs
+  s3:
+    bucket: fileweaver-files
+  aws:
+    region: us-east-1
+    endpoint: http://localhost:4566
+    access-key: test
+    secret-key: test
+  auth:
+    admin-key: localdev-master
+
+logging:
+  level:
+    com.fileweaver: DEBUG

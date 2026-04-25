@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: fileweaver
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/fileweaver}
+      database: ${MONGODB_DATABASE:fileweaver}
+  jackson:
+    mapper:
+      sort-properties-alphabetically: true
+
+server:
+  port: ${PORT:8080}
+
+app:
+  version: 1.0.0
+  queue:
+    name: ${SQS_QUEUE_NAME:fileweaver-jobs}
+  s3:
+    bucket: ${S3_BUCKET:fileweaver-files}
+    download-url-ttl: PT15M
+  aws:
+    region: ${AWS_REGION:ap-south-1}
+    endpoint: ${AWS_ENDPOINT:}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+  auth:
+    admin-key: ${REPORT_ADMIN_KEY:}
+    cache-ttl: PT5M
+  idempotency:
+    bucket-by-day: true
+
+logging:
+  level:
+    com.fileweaver: INFO
+    org.springframework: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: when-authorized

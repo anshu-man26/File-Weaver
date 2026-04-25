@@ -1,6 +1,8 @@
 package com.fileweaver.api.lambda;
 
 import com.amazonaws.serverless.exceptions.ContainerInitializationException;
+import com.amazonaws.serverless.proxy.model.HttpApiV2ProxyRequest;
+import com.amazonaws.serverless.proxy.model.AwsProxyResponse;
 import com.amazonaws.serverless.proxy.spring.SpringBootLambdaContainerHandler;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
@@ -13,14 +15,18 @@ import java.io.OutputStream;
 /**
  * API Gateway -> Lambda entrypoint. Boots the Spring application once per
  * container and replays HTTP requests through the Spring DispatcherServlet.
+ *
+ * Uses the HTTP API v2 proxy handler because serverless.yml provisions an
+ * `httpApi: '*'` event source. The v1 `getAwsProxyHandler` would reject
+ * the v2 event shape with InvalidRequestEventException.
  */
 public class ApiGatewayLambdaHandler implements RequestStreamHandler {
 
-    private static SpringBootLambdaContainerHandler<?, ?> handler;
+    private static SpringBootLambdaContainerHandler<HttpApiV2ProxyRequest, AwsProxyResponse> handler;
 
     static {
         try {
-            handler = SpringBootLambdaContainerHandler.getAwsProxyHandler(Application.class);
+            handler = SpringBootLambdaContainerHandler.getHttpApiV2ProxyHandler(Application.class);
         } catch (ContainerInitializationException e) {
             throw new IllegalStateException("Could not initialize Spring Boot Lambda handler", e);
         }

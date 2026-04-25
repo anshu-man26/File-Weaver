@@ -5,11 +5,6 @@ import com.fileweaver.reports.Report;
 import com.fileweaver.reports.ReportData;
 import com.fileweaver.reports.ReportType;
 import org.bson.Document;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -24,18 +19,17 @@ import java.util.Map;
  *
  * Payload: { "userId": "<24-char hex Mongo ObjectId>" }
  *
- * The clickandcare MongoTemplate is optional — fileweaver still boots
- * without CLICKANDCARE_MONGODB_URI set, but APPOINTMENT_LOG requests will
- * fail at validate() with a clear error if it's missing.
+ * The gateway is optional — fileweaver still boots without
+ * CLICKANDCARE_MONGODB_URI set, but APPOINTMENT_LOG requests will fail
+ * at validate() with a clear error if it's missing.
  */
 @Component
 public class AppointmentLogReport implements Report {
 
-    private final MongoTemplate clickandcareMongo;
+    private final ClickAndCareGateway clickandcare;
 
-    public AppointmentLogReport(
-            @Qualifier("clickandcareMongoTemplate") @Nullable MongoTemplate clickandcareMongo) {
-        this.clickandcareMongo = clickandcareMongo;
+    public AppointmentLogReport(@Nullable ClickAndCareGateway clickandcare) {
+        this.clickandcare = clickandcare;
     }
 
     @Override
@@ -43,7 +37,7 @@ public class AppointmentLogReport implements Report {
 
     @Override
     public void validate(Map<String, Object> payload) {
-        if (clickandcareMongo == null) {
+        if (clickandcare == null) {
             throw new IllegalStateException(
                 "APPOINTMENT_LOG requires CLICKANDCARE_MONGODB_URI to be configured");
         }
@@ -53,10 +47,7 @@ public class AppointmentLogReport implements Report {
     @Override
     public ReportData generate(Map<String, Object> payload) {
         String userId = (String) payload.get("userId");
-
-        Query q = Query.query(Criteria.where("userId").is(userId))
-            .with(Sort.by(Sort.Direction.DESC, "date"));
-        List<Document> docs = clickandcareMongo.find(q, Document.class, "appointments");
+        List<Document> docs = clickandcare.findAppointmentsByUserId(userId);
 
         List<List<Object>> rows = new ArrayList<>(docs.size());
         for (Document a : docs) {

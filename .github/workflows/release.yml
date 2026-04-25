@@ -58,8 +58,19 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Build shadow jar
-        run: ./gradlew shadowJar --no-daemon
+      - name: Build shadow jar (clean, no build cache to avoid stale layouts)
+        run: ./gradlew clean shadowJar --no-daemon --no-build-cache
+
+      - name: Verify jar layout
+        run: |
+          echo "=== build/libs/ ==="
+          ls -la build/libs/
+          echo "=== Handler classes inside fat jar ==="
+          unzip -l build/libs/fileweaver-aws.jar | grep -E "ApiGatewayLambdaHandler|SqsLambdaHandler" || true
+          echo "=== Anything in BOOT-INF (should print nothing) ==="
+          unzip -l build/libs/fileweaver-aws.jar | grep "BOOT-INF" | head -5 || true
+          echo "=== First 20 entries ==="
+          unzip -l build/libs/fileweaver-aws.jar | head -25
 
       - name: Set up Node (for Serverless Framework)
         uses: actions/setup-node@v4

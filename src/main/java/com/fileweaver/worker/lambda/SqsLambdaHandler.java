@@ -30,8 +30,14 @@ public class SqsLambdaHandler implements RequestHandler<SQSEvent, SQSBatchRespon
 
     private static synchronized ConfigurableApplicationContext init() {
         if (context == null) {
+            // Worker doesn't serve HTTP. Force non-web mode AND exclude the
+            // serverless-web auto-config that gets pulled in transitively by
+            // aws-serverless-java-container-springboot3 — it tries to register
+            // ServerlessServletWebServerFactory as ApplicationContextAware
+            // and ClassCasts on the non-web AnnotationConfigApplicationContext.
+            System.setProperty("spring.autoconfigure.exclude",
+                "org.springframework.cloud.function.serverless.web.ServerlessAutoConfiguration");
             SpringApplication app = new SpringApplication(Application.class);
-            // Worker Lambda doesn't need the embedded HTTP server.
             app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
             context = app.run();
         }

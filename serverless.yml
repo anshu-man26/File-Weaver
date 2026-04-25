@@ -15,7 +15,8 @@ provider:
     REPORT_ADMIN_KEY: ${env:REPORT_ADMIN_KEY}
     SQS_QUEUE_NAME: ${self:service}-${self:provider.stage}-jobs
     S3_BUCKET: ${self:service}-${self:provider.stage}-files
-    AWS_REGION: ${env:AWS_REGION, 'ap-south-1'}
+    # AWS_REGION is auto-injected by the Lambda runtime — setting it here
+    # would trigger "reserved key" rejection at deploy time.
   iam:
     role:
       statements:

@@ -108,13 +108,10 @@ resources:
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching
 
+# Use the shadow fat jar AS the deployment artifact — Lambda extracts a
+# .jar (which is a zip) directly into /var/task/, so our compiled .class
+# files land on the classpath. The previous `patterns:` approach put the
+# jar at /var/task/build/libs/fileweaver-aws.jar — which Lambda's Java
+# runtime doesn't scan, causing ClassNotFoundException for the handler.
 package:
-  individually: false
-  excludeDevDependencies: true
-  patterns:
-    - '!**'
-    - 'build/libs/fileweaver-aws.jar'
-
-custom:
-  shadowJar:
-    enabled: true
+  artifact: build/libs/fileweaver-aws.jar

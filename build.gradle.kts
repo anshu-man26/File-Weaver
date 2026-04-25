@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransformer
+
 plugins {
     java
     id("org.springframework.boot") version "3.3.4"
@@ -89,6 +91,22 @@ tasks.shadowJar {
     archiveBaseName.set("fileweaver")
     archiveVersion.set("")
     mergeServiceFiles()
+
+    // Spring Boot 3 puts auto-config descriptors in META-INF/spring/. Each
+    // starter contributes its own copy of these files; without explicit
+    // append transformers, shadow's default "first wins" behavior drops
+    // most of them — and Spring Boot silently skips loading the missing
+    // auto-configurations (MongoRepositoriesAutoConfiguration etc).
+    transform(AppendingTransformer::class.java) {
+        resource = "META-INF/spring.factories"
+    }
+    transform(AppendingTransformer::class.java) {
+        resource = "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports"
+    }
+    transform(AppendingTransformer::class.java) {
+        resource = "META-INF/spring/org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration.imports"
+    }
+
     from(sourceSets.main.get().output)
     configurations = listOf(project.configurations.runtimeClasspath.get())
 }

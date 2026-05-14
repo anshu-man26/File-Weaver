@@ -56,7 +56,11 @@ public class PdfWriter implements Writer {
 
         boolean isReceipt = data.metadata() != null
             && "receipt".equals(String.valueOf(data.metadata().get("layout")));
-        if (isReceipt) {
+        boolean isGallery = data.metadata() != null
+            && "nasa_gallery".equals(String.valueOf(data.metadata().get("layout")));
+        if (isGallery) {
+            renderGallery(doc, data);
+        } else if (isReceipt) {
             renderReceipt(doc, data);
         } else {
             renderTabular(doc, data);
@@ -327,6 +331,102 @@ public class PdfWriter implements Writer {
         cell.setPaddingBottom(spaceAfter);
         line.addCell(cell);
         try { doc.add(line); } catch (Exception ignore) {}
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // NASA Gallery layout — image + title + description per item.
+    // ──────────────────────────────────────────────────────────────────
+    @SuppressWarnings("unchecked")
+    private void renderGallery(Document doc, ReportData data) {
+        Map<String, Object> m = data.metadata();
+        String query = String.valueOf(m.getOrDefault("query", ""));
+        List<Map<String, Object>> items = (List<Map<String, Object>>) m.get("items");
+
+        // Cover header
+        Paragraph cover = new Paragraph("NASA Gallery",
+            FontFactory.getFont(FontFactory.HELVETICA_BOLD, 28, BRAND));
+        cover.setAlignment(Element.ALIGN_CENTER);
+        doc.add(cover);
+
+        Paragraph queryPara = new Paragraph(query.toUpperCase(),
+            FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, SUBINK));
+        queryPara.setAlignment(Element.ALIGN_CENTER);
+        queryPara.setSpacingAfter(6);
+        doc.add(queryPara);
+
+        Paragraph tagline = new Paragraph("Imagery sourced from NASA Image and Video Library",
+            FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 9, MUTED));
+        tagline.setAlignment(Element.ALIGN_CENTER);
+        tagline.setSpacingAfter(20);
+        doc.add(tagline);
+
+        addHairline(doc, 4, 20);
+
+        if (items == null) return;
+
+        for (Map<String, Object> item : items) {
+            String imageUrl   = String.valueOf(item.getOrDefault("imageUrl", ""));
+            String title      = String.valueOf(item.getOrDefault("title", ""));
+            String description= String.valueOf(item.getOrDefault("description", ""));
+            String date       = String.valueOf(item.getOrDefault("date", ""));
+            String center     = String.valueOf(item.getOrDefault("center", ""));
+            String keywords   = String.valueOf(item.getOrDefault("keywords", ""));
+
+            // Image
+            if (!imageUrl.isBlank()) {
+                try {
+                    com.lowagie.text.Image img =
+                        com.lowagie.text.Image.getInstance(new java.net.URL(imageUrl));
+                    img.setWidthPercentage(100f);
+                    img.setSpacingAfter(10);
+                    doc.add(img);
+                } catch (Exception ignore) {}
+            }
+
+            // Title
+            Paragraph titlePara = new Paragraph(title,
+                FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, INK));
+            titlePara.setSpacingBefore(8);
+            titlePara.setSpacingAfter(4);
+            doc.add(titlePara);
+
+            // Date · Center
+            if (!date.isBlank() || !center.isBlank()) {
+                String metaText = (!date.isBlank() && !center.isBlank())
+                    ? date + "  ·  " + center
+                    : date + center;
+                Paragraph metaLine = new Paragraph(metaText, META);
+                metaLine.setSpacingAfter(4);
+                doc.add(metaLine);
+            }
+
+            // Keywords
+            if (!keywords.isBlank() && !"null".equals(keywords)) {
+                Paragraph kwPara = new Paragraph(keywords,
+                    FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 9, MUTED));
+                kwPara.setSpacingAfter(6);
+                doc.add(kwPara);
+            }
+
+            // Description (capped at 600 chars)
+            if (!description.isBlank() && !"null".equals(description)) {
+                String desc = description.length() > 600
+                    ? description.substring(0, 600) + "…"
+                    : description;
+                Paragraph descPara = new Paragraph(desc, BODY_SUB);
+                descPara.setSpacingAfter(18);
+                doc.add(descPara);
+            }
+
+            addHairline(doc, 6, 18);
+        }
+
+        // Footer
+        Paragraph footer = new Paragraph(
+            "NASA Image and Video Library  ·  images.nasa.gov", META);
+        footer.setAlignment(Element.ALIGN_CENTER);
+        footer.setSpacingBefore(8);
+        doc.add(footer);
     }
 
     // ──────────────────────────────────────────────────────────────────

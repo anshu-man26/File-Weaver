@@ -5,5 +5,6 @@ public enum ReportType {
     TAX_SUMMARY,
     APPOINTMENT_LOG,
     APPOINTMENT_RECEIPT,
-    USER_ACTIVITY
+    USER_ACTIVITY,
+    NASA_GALLERY
 }

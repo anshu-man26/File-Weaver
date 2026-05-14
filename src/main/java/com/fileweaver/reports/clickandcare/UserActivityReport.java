@@ -1,4 +1,4 @@
-package com.fileweaver.reports.impl;
+package com.fileweaver.reports.clickandcare;
 
 import com.fileweaver.reports.PayloadValidation;
 import com.fileweaver.reports.Report;
@@ -29,12 +29,13 @@ public class UserActivityReport implements Report {
         for (Map<String, Object> e : events) {
             rows.add(List.of(
                 (Object) String.valueOf(e.getOrDefault("timestamp", "")),
-                String.valueOf(e.getOrDefault("userId", "")),
-                String.valueOf(e.getOrDefault("action", "")),
+                String.valueOf(e.getOrDefault("userId",   "")),
+                String.valueOf(e.getOrDefault("action",   "")),
                 String.valueOf(e.getOrDefault("metadata", ""))
             ));
         }
         return new ReportData(
+            ReportType.USER_ACTIVITY,
             "User Activity",
             List.of("Timestamp", "User", "Action", "Metadata"),
             rows,

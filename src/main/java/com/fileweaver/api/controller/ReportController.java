@@ -16,6 +16,7 @@ import com.fileweaver.storage.PresignedUrl;
 import com.fileweaver.storage.S3Uploader;
 import com.fileweaver.writers.WriterFactory;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +39,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/reports")
+@RequiredArgsConstructor
 public class ReportController {
 
     private static final Logger log = LoggerFactory.getLogger(ReportController.class);
@@ -51,20 +53,6 @@ public class ReportController {
 
     @Value("${app.s3.download-url-ttl:PT15M}")
     private Duration downloadTtl;
-
-    public ReportController(JobService jobs,
-                            ReportRegistry reports,
-                            WriterFactory writers,
-                            IdempotencyService idempotency,
-                            QueueClient queue,
-                            S3Uploader s3) {
-        this.jobs = jobs;
-        this.reports = reports;
-        this.writers = writers;
-        this.idempotency = idempotency;
-        this.queue = queue;
-        this.s3 = s3;
-    }
 
     @PostMapping
     public ResponseEntity<JobResponse> create(@Valid @RequestBody CreateReportRequest req,
@@ -145,18 +133,18 @@ public class ReportController {
     }
 
     private Job newJob(CreateReportRequest req, String idemKey, ApiKey caller) {
-        Job j = new Job();
-        j.setId(UUID.randomUUID().toString());
-        j.setIdempotencyKey(idemKey);
-        j.setType(req.getType());
-        j.setFormat(req.getFormat());
-        j.setPayload(req.getPayload());
-        j.setStatus(JobStatus.QUEUED);
-        j.setAttempts(0);
-        j.setRequestedBy(new Job.RequestedBy(caller.getName(), caller.getId()));
         Instant now = Instant.now();
-        j.setCreatedAt(now);
-        j.setUpdatedAt(now);
-        return j;
+        return Job.builder()
+            .id(UUID.randomUUID().toString())
+            .idempotencyKey(idemKey)
+            .type(req.getType())
+            .format(req.getFormat())
+            .payload(req.getPayload())
+            .status(JobStatus.QUEUED)
+            .attempts(0)
+            .requestedBy(new Job.RequestedBy(caller.getName(), caller.getId()))
+            .createdAt(now)
+            .updatedAt(now)
+            .build();
     }
 }

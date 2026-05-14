@@ -9,8 +9,8 @@ import com.fileweaver.queue.JobMessage;
 import com.fileweaver.queue.QueueClient;
 import com.fileweaver.reports.ReportType;
 import com.fileweaver.writers.Format;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -34,6 +34,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/admin/jobs")
+@RequiredArgsConstructor
 public class AdminJobController {
 
     private final JobRepository repo;
@@ -44,15 +45,6 @@ public class AdminJobController {
 
     @Value("${app.s3.bucket}")
     private String bucket;
-
-    public AdminJobController(JobRepository repo, JobService jobs, MongoTemplate mongo,
-                              QueueClient queue, S3Client s3) {
-        this.repo = repo;
-        this.jobs = jobs;
-        this.mongo = mongo;
-        this.queue = queue;
-        this.s3 = s3;
-    }
 
     @GetMapping
     public List<JobResponse> list(@RequestParam(required = false) JobStatus status,

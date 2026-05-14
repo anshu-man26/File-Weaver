@@ -54,6 +54,12 @@ dependencies {
     implementation("org.apache.poi:poi-ooxml:5.3.0")
     implementation("com.opencsv:opencsv:5.9")
 
+    // Lombok
+    compileOnly("org.projectlombok:lombok:1.18.34")
+    annotationProcessor("org.projectlombok:lombok:1.18.34")
+    testCompileOnly("org.projectlombok:lombok:1.18.34")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.34")
+
     // JSON
     implementation("com.fasterxml.jackson.core:jackson-databind")
 

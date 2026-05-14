@@ -3,6 +3,7 @@ package com.fileweaver.auth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fileweaver.api.dto.ApiError;
 import jakarta.servlet.FilterChain;
+import lombok.RequiredArgsConstructor;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
+@RequiredArgsConstructor
 public class AdminKeyFilter extends OncePerRequestFilter {
 
     private static final String HEADER = "X-Admin-Key";
@@ -23,10 +25,6 @@ public class AdminKeyFilter extends OncePerRequestFilter {
 
     @Value("${app.auth.admin-key:}")
     private String adminKey;
-
-    public AdminKeyFilter(ObjectMapper mapper) {
-        this.mapper = mapper;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

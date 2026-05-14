@@ -1,4 +1,4 @@
-package com.fileweaver.reports.impl;
+package com.fileweaver.reports.clickandcare;
 
 import com.fileweaver.reports.PayloadValidation;
 import com.fileweaver.reports.Report;
@@ -15,16 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Single-appointment payment receipt. Looks up the appointment by id from
- * ClickAndCare's MongoDB and produces a richly-decorated ReportData that
- * the receipt-aware PdfWriter renders as a Stripe-style invoice page.
- *
- * Payload: { "appointmentId": "<24-char hex>" }
- *
- * The report sets `metadata.layout = "receipt"` so PdfWriter switches to
- * its invoice template instead of the default tabular dump.
- */
 @Component
 public class AppointmentReceiptReport implements Report {
 
@@ -42,10 +32,8 @@ public class AppointmentReceiptReport implements Report {
 
     @Override
     public void validate(Map<String, Object> payload) {
-        if (clickandcare == null) {
-            throw new IllegalStateException(
-                "APPOINTMENT_RECEIPT requires CLICKANDCARE_MONGODB_URI to be configured");
-        }
+        if (clickandcare == null)
+            throw new IllegalStateException("APPOINTMENT_RECEIPT requires CLICKANDCARE_MONGODB_URI");
         PayloadValidation.require(payload, "appointmentId", String.class);
     }
 
@@ -53,54 +41,42 @@ public class AppointmentReceiptReport implements Report {
     public ReportData generate(Map<String, Object> payload) {
         String appointmentId = (String) payload.get("appointmentId");
         Document appt = clickandcare.findAppointmentById(appointmentId);
-        if (appt == null) {
+        if (appt == null)
             throw new IllegalArgumentException("Appointment not found: " + appointmentId);
-        }
 
-        Document docData = appt.get("docData", Document.class);
+        Document docData  = appt.get("docData",  Document.class);
         Document userData = appt.get("userData", Document.class);
 
-        String docName     = nullSafe(docData, "name", "Unknown Doctor");
-        String docDegree   = nullSafe(docData, "degree", "");
-        String docSpec     = nullSafe(docData, "speciality", "");
-        String docFees     = appt.get("amount") == null ? "0" : appt.get("amount").toString();
+        String docName    = ClickAndCareGateway.field(docData, "name",      "Unknown Doctor");
+        String docDegree  = ClickAndCareGateway.field(docData, "degree",    "");
+        String docSpec    = ClickAndCareGateway.field(docData, "speciality","");
+        String docFees    = appt.get("amount") == null ? "0" : appt.get("amount").toString();
 
-        String patientName  = nullSafe(userData, "name", "Patient");
-        String patientEmail = nullSafe(userData, "email", "");
-        String patientPhone = nullSafe(userData, "phone", "");
+        String patientName  = ClickAndCareGateway.field(userData, "name",  "Patient");
+        String patientEmail = ClickAndCareGateway.field(userData, "email", "");
+        String patientPhone = ClickAndCareGateway.field(userData, "phone", "");
 
-        String slotDate = nullSafe(appt, "slotDate", "");
-        String slotTime = nullSafe(appt, "slotTime", "");
+        String slotDate = ClickAndCareGateway.field(appt, "slotDate", "");
+        String slotTime = ClickAndCareGateway.field(appt, "slotTime", "");
 
         String description = "Doctor consultation with " + docName
             + (docSpec.isBlank() ? "" : " (" + docSpec + ")")
             + " on " + slotDate + " at " + slotTime;
 
-        // Line items table — what the writer renders in the middle of the
-        // receipt as a single-row table.
         List<List<Object>> rows = List.of(List.of(
-            (Object) description,
-            "1",
-            "INR " + docFees,
-            "INR " + docFees
-        ));
+            (Object) description, "1", "INR " + docFees, "INR " + docFees));
 
         Map<String, Object> meta = new LinkedHashMap<>();
-        meta.put("layout", "receipt");
         meta.put("receiptNumber", "RCT-" + appointmentId.substring(Math.max(0, appointmentId.length() - 8)).toUpperCase());
         meta.put("appointmentId", appointmentId);
         Number issuedAt = appt.get("date", Number.class);
         meta.put("issueDate", ISSUE_DATE_FMT.format(
             issuedAt != null ? Instant.ofEpochMilli(issuedAt.longValue()) : Instant.now()));
 
-        // Friendly filename for the download — slug "Patient-Doctor-Date.pdf"
-        String slugDate = nullSafe(appt, "slotDate", "")
-            .replaceAll("[^A-Za-z0-9]+", "-");
-        String filename = slug(patientName)
+        String slugDate = ClickAndCareGateway.field(appt, "slotDate", "").replaceAll("[^A-Za-z0-9]+", "-");
+        meta.put("downloadFilename", slug(patientName)
             + "_" + slug(docName.startsWith("Dr") ? docName : "Dr-" + docName)
-            + (slugDate.isBlank() ? "" : "_" + slugDate)
-            + ".pdf";
-        meta.put("downloadFilename", filename);
+            + (slugDate.isBlank() ? "" : "_" + slugDate) + ".pdf");
 
         Map<String, Object> billedTo = new LinkedHashMap<>();
         billedTo.put("name", patientName);
@@ -117,24 +93,25 @@ public class AppointmentReceiptReport implements Report {
         Map<String, Object> provider = new LinkedHashMap<>();
         provider.put("name", docName);
         if (!docDegree.isBlank()) provider.put("degree", docDegree);
-        if (!docSpec.isBlank()) provider.put("speciality", docSpec);
+        if (!docSpec.isBlank())   provider.put("speciality", docSpec);
         provider.put("date", slotDate);
         provider.put("time", slotTime);
         meta.put("provider", provider);
 
         Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("subtotal", "INR " + docFees);
-        totals.put("tax", "INR 0");
-        totals.put("total", "INR " + docFees);
+        totals.put("tax",      "INR 0");
+        totals.put("total",    "INR " + docFees);
         meta.put("totals", totals);
 
         Map<String, Object> payment = new LinkedHashMap<>();
-        payment.put("status", deriveStatus(appt));
-        payment.put("method", "Stripe (Card)");
+        payment.put("status",         deriveStatus(appt));
+        payment.put("method",         "Stripe (Card)");
         payment.put("transactionRef", appointmentId);
         meta.put("payment", payment);
 
         return new ReportData(
+            ReportType.APPOINTMENT_RECEIPT,
             "Receipt — " + meta.get("receiptNumber"),
             List.of("Description", "Qty", "Unit Price", "Total"),
             rows,
@@ -143,22 +120,14 @@ public class AppointmentReceiptReport implements Report {
     }
 
     private static String deriveStatus(Document a) {
-        if (Boolean.TRUE.equals(a.getBoolean("cancelled"))) return "Cancelled";
+        if (Boolean.TRUE.equals(a.getBoolean("cancelled")))  return "Cancelled";
         if (Boolean.TRUE.equals(a.getBoolean("isCompleted"))) return "Completed";
-        if (Boolean.TRUE.equals(a.getBoolean("payment"))) return "Paid";
+        if (Boolean.TRUE.equals(a.getBoolean("payment")))    return "Paid";
         return "Pending";
     }
 
-    private static String nullSafe(Document d, String key, String fallback) {
-        if (d == null) return fallback;
-        String v = d.getString(key);
-        return v == null ? fallback : v;
-    }
-
-    /** Filename-safe slug — strips punctuation, collapses whitespace into "-". */
     private static String slug(String s) {
         if (s == null || s.isBlank()) return "x";
-        String trimmed = s.trim().replaceAll("[^A-Za-z0-9]+", "-");
-        return trimmed.replaceAll("^-+|-+$", "");
+        return s.trim().replaceAll("[^A-Za-z0-9]+", "-").replaceAll("^-+|-+$", "");
     }
 }

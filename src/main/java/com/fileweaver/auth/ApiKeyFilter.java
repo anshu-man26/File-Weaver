@@ -3,6 +3,7 @@ package com.fileweaver.auth;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fileweaver.api.dto.ApiError;
 import jakarta.servlet.FilterChain;
+import lombok.RequiredArgsConstructor;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 @Component
+@RequiredArgsConstructor
 public class ApiKeyFilter extends OncePerRequestFilter {
 
     private static final String HEADER = "X-Api-Key";
@@ -26,11 +28,6 @@ public class ApiKeyFilter extends OncePerRequestFilter {
 
     @Value("${app.auth.admin-key:}")
     private String adminKey;
-
-    public ApiKeyFilter(ApiKeyService service, ObjectMapper mapper) {
-        this.service = service;
-        this.mapper = mapper;
-    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -75,11 +72,11 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     }
 
     private static ApiKey syntheticAdminKey() {
-        ApiKey k = new ApiKey();
-        k.setId("__admin__");
-        k.setName("master-admin");
-        k.setActive(true);
-        k.setScopes(java.util.List.of("admin", "reports:create", "reports:read"));
-        return k;
+        return ApiKey.builder()
+            .id("__admin__")
+            .name("master-admin")
+            .active(true)
+            .scopes(java.util.List.of("admin", "reports:create", "reports:read"))
+            .build();
     }
 }

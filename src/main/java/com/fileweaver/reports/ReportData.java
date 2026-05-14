@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 public record ReportData(
+    ReportType type,
     String title,
     List<String> headers,
     List<List<Object>> rows,

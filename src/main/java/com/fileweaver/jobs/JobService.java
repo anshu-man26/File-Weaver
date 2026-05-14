@@ -1,5 +1,6 @@
 package com.fileweaver.jobs;
 
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +17,7 @@ import static com.fileweaver.jobs.JobStatus.PROCESSING;
 import static com.fileweaver.jobs.JobStatus.QUEUED;
 
 @Service
+@RequiredArgsConstructor
 public class JobService {
 
     private static final Logger log = LoggerFactory.getLogger(JobService.class);
@@ -25,11 +27,6 @@ public class JobService {
 
     @Value("${app.s3.bucket}")
     private String bucket;
-
-    public JobService(JobRepository repo, MongoTemplate mongo) {
-        this.repo = repo;
-        this.mongo = mongo;
-    }
 
     public Job insert(Job job) {
         Instant now = Instant.now();

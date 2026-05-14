@@ -1,4 +1,4 @@
-package com.fileweaver.reports.impl;
+package com.fileweaver.reports.clickandcare;
 
 import com.fileweaver.reports.PayloadValidation;
 import com.fileweaver.reports.Report;
@@ -13,16 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Pulls a user's appointments straight from ClickAndCare's MongoDB
- * (Approach A — fileweaver knows ClickAndCare's appointment schema).
- *
- * Payload: { "userId": "<24-char hex Mongo ObjectId>" }
- *
- * The gateway is optional — fileweaver still boots without
- * CLICKANDCARE_MONGODB_URI set, but APPOINTMENT_LOG requests will fail
- * at validate() with a clear error if it's missing.
- */
 @Component
 public class AppointmentLogReport implements Report {
 
@@ -37,10 +27,8 @@ public class AppointmentLogReport implements Report {
 
     @Override
     public void validate(Map<String, Object> payload) {
-        if (clickandcare == null) {
-            throw new IllegalStateException(
-                "APPOINTMENT_LOG requires CLICKANDCARE_MONGODB_URI to be configured");
-        }
+        if (clickandcare == null)
+            throw new IllegalStateException("APPOINTMENT_LOG requires CLICKANDCARE_MONGODB_URI");
         PayloadValidation.require(payload, "userId", String.class);
     }
 
@@ -51,14 +39,14 @@ public class AppointmentLogReport implements Report {
 
         List<List<Object>> rows = new ArrayList<>(docs.size());
         for (Document a : docs) {
-            String when = nullSafe(a.getString("slotDate")) + " " + nullSafe(a.getString("slotTime"));
-            Document docData = a.get("docData", Document.class);
+            String when      = ClickAndCareGateway.field(a, "slotDate", "") + " " + ClickAndCareGateway.field(a, "slotTime", "");
+            Document docData  = a.get("docData",  Document.class);
             Document userData = a.get("userData", Document.class);
-            String provider = docData != null ? nullSafe(docData.getString("name")) : "Unknown";
-            String speciality = docData != null ? nullSafe(docData.getString("speciality")) : "";
-            String patient = userData != null ? nullSafe(userData.getString("name")) : "Unknown";
-            String status = deriveStatus(a);
-            Object fee = a.get("amount");
+            String provider  = ClickAndCareGateway.field(docData,  "name",      "Unknown");
+            String speciality= ClickAndCareGateway.field(docData,  "speciality", "");
+            String patient   = ClickAndCareGateway.field(userData, "name", "Unknown");
+            String status    = deriveStatus(a);
+            Object fee       = a.get("amount");
             rows.add(List.of(
                 (Object) when,
                 patient,
@@ -69,10 +57,11 @@ public class AppointmentLogReport implements Report {
         }
 
         Map<String, Object> meta = new LinkedHashMap<>();
-        meta.put("count", docs.size());
+        meta.put("count",  docs.size());
         meta.put("userId", userId);
 
         return new ReportData(
+            ReportType.APPOINTMENT_LOG,
             "Appointment Log",
             List.of("When", "Patient", "Provider", "Status", "Fee"),
             rows,
@@ -81,11 +70,10 @@ public class AppointmentLogReport implements Report {
     }
 
     private static String deriveStatus(Document a) {
-        if (Boolean.TRUE.equals(a.getBoolean("cancelled"))) return "Cancelled";
+        if (Boolean.TRUE.equals(a.getBoolean("cancelled")))   return "Cancelled";
         if (Boolean.TRUE.equals(a.getBoolean("isCompleted"))) return "Completed";
-        if (Boolean.TRUE.equals(a.getBoolean("payment"))) return "Confirmed";
+        if (Boolean.TRUE.equals(a.getBoolean("payment")))     return "Confirmed";
         return "Pending";
     }
 
-    private static String nullSafe(String s) { return s == null ? "" : s; }
 }

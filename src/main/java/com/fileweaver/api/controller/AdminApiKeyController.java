@@ -7,6 +7,7 @@ import com.fileweaver.auth.ApiKeyGenerator;
 import com.fileweaver.auth.ApiKeyRepository;
 import com.fileweaver.auth.ApiKeyService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,15 +25,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/admin/api-keys")
+@RequiredArgsConstructor
 public class AdminApiKeyController {
 
     private final ApiKeyRepository repo;
     private final ApiKeyService service;
-
-    public AdminApiKeyController(ApiKeyRepository repo, ApiKeyService service) {
-        this.repo = repo;
-        this.service = service;
-    }
 
     @PostMapping
     public ResponseEntity<ApiKeyResponse> create(@Valid @RequestBody CreateApiKeyRequest req) {
@@ -41,15 +38,15 @@ public class AdminApiKeyController {
                 "Key name already exists: " + req.getName());
         }
         String plaintext = ApiKeyGenerator.generate();
-        ApiKey k = new ApiKey();
-        k.setName(req.getName());
-        k.setKeyHash(ApiKeyGenerator.hash(plaintext));
-        k.setPrefix(ApiKeyGenerator.prefix(plaintext));
-        k.setScopes(req.getScopes() != null ? req.getScopes()
-            : List.of("reports:create", "reports:read"));
-        k.setActive(true);
-        k.setCreatedAt(Instant.now());
-        k.setCreatedByName("admin");
+        ApiKey k = ApiKey.builder()
+            .name(req.getName())
+            .keyHash(ApiKeyGenerator.hash(plaintext))
+            .prefix(ApiKeyGenerator.prefix(plaintext))
+            .scopes(req.getScopes() != null ? req.getScopes() : List.of("reports:create", "reports:read"))
+            .active(true)
+            .createdAt(Instant.now())
+            .createdByName("admin")
+            .build();
         ApiKey saved = repo.save(k);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiKeyResponse.withPlaintext(saved, plaintext));

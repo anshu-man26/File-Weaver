@@ -1,4 +1,4 @@
-package com.fileweaver.reports.impl;
+package com.fileweaver.reports.clickandcare;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -17,21 +17,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/**
- * Wraps a secondary MongoDB connection to ClickAndCare's database.
- *
- * The MongoTemplate is held internally — never published as a Spring bean —
- * so Spring Boot's auto-configuration of the *primary* MongoTemplate (used
- * by fileweaver's own jobs/apiKeys repositories) isn't disturbed by
- * @ConditionalOnMissingBean checks.
- *
- * Registered only when app.clickandcare.mongodb-uri is set to a real
- * connection string. Plain @ConditionalOnProperty would also match an
- * empty value ("CLICKANDCARE_MONGODB_URI="), and the constructor would
- * then crash trying to parse it; @ConditionalOnExpression guards against
- * that. When missing, AppointmentLogReport / AppointmentReceiptReport
- * inject null and fail the request at validate() with a clear error.
- */
 @Service
 @ConditionalOnExpression("'${app.clickandcare.mongodb-uri:}'.startsWith('mongodb')")
 public class ClickAndCareGateway {
@@ -44,22 +29,18 @@ public class ClickAndCareGateway {
         this.client = MongoClients.create(MongoClientSettings.builder()
             .applyConnectionString(cs)
             .build());
-        // ClickAndCare's backend appends `Click&Care` as the DB name when
-        // the URI doesn't include one — match that.
         String dbName = cs.getDatabase() != null && !cs.getDatabase().isBlank()
             ? cs.getDatabase()
             : "Click&Care";
         this.template = new MongoTemplate(client, dbName);
     }
 
-    /** Most-recent-first list of appointment documents for a user. */
     public List<Document> findAppointmentsByUserId(String userId) {
         Query q = Query.query(Criteria.where("userId").is(userId))
             .with(Sort.by(Sort.Direction.DESC, "date"));
         return template.find(q, Document.class, "appointments");
     }
 
-    /** Single appointment by its 24-char hex ObjectId. Null if not found. */
     public Document findAppointmentById(String id) {
         if (id == null || !ObjectId.isValid(id)) return null;
         Query q = Query.query(Criteria.where("_id").is(new ObjectId(id)));
@@ -69,5 +50,11 @@ public class ClickAndCareGateway {
     @PreDestroy
     public void close() {
         if (client != null) client.close();
+    }
+
+    public static String field(Document d, String key, String fallback) {
+        if (d == null) return fallback;
+        String v = d.getString(key);
+        return v == null ? fallback : v;
     }
 }

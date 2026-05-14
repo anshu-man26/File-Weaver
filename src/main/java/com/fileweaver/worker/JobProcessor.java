@@ -11,6 +11,7 @@ import com.fileweaver.writers.Writer;
 import com.fileweaver.writers.WriterFactory;
 import com.fileweaver.writers.WriterOutput;
 import com.fileweaver.writers.exceptions.UnsupportedFormatException;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class JobProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(JobProcessor.class);
@@ -28,13 +30,6 @@ public class JobProcessor {
     private final ReportRegistry reports;
     private final WriterFactory writers;
     private final S3Uploader s3;
-
-    public JobProcessor(JobService jobs, ReportRegistry reports, WriterFactory writers, S3Uploader s3) {
-        this.jobs = jobs;
-        this.reports = reports;
-        this.writers = writers;
-        this.s3 = s3;
-    }
 
     public void process(String jobId) {
         Optional<Job> claimed = jobs.tryClaim(jobId);
@@ -81,11 +76,13 @@ public class JobProcessor {
     }
 
     private static String errorCode(Throwable e) {
-        if (e instanceof UnknownReportTypeException) return "UNKNOWN_REPORT_TYPE";
-        if (e instanceof UnsupportedFormatException) return "UNSUPPORTED_FORMAT";
-        if (e instanceof IllegalArgumentException) return "INVALID_PAYLOAD";
-        if (e instanceof S3Exception) return "S3_UPLOAD_FAILED";
-        return "INTERNAL_ERROR";
+        return switch (e) {
+            case UnknownReportTypeException ignored -> "UNKNOWN_REPORT_TYPE";
+            case UnsupportedFormatException  ignored -> "UNSUPPORTED_FORMAT";
+            case IllegalArgumentException    ignored -> "INVALID_PAYLOAD";
+            case S3Exception                 ignored -> "S3_UPLOAD_FAILED";
+            default                                  -> "INTERNAL_ERROR";
+        };
     }
 
     private static String safeMessage(Throwable e) {

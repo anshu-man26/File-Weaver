@@ -8,7 +8,7 @@ import jakarta.annotation.PreDestroy;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -25,12 +25,15 @@ import java.util.List;
  * by fileweaver's own jobs/apiKeys repositories) isn't disturbed by
  * @ConditionalOnMissingBean checks.
  *
- * Registered only when app.clickandcare.mongodb-uri is set (env:
- * CLICKANDCARE_MONGODB_URI). When missing, AppointmentLogReport injects
- * null and fails the request at validate() with a clear error.
+ * Registered only when app.clickandcare.mongodb-uri is set to a real
+ * connection string. Plain @ConditionalOnProperty would also match an
+ * empty value ("CLICKANDCARE_MONGODB_URI="), and the constructor would
+ * then crash trying to parse it; @ConditionalOnExpression guards against
+ * that. When missing, AppointmentLogReport / AppointmentReceiptReport
+ * inject null and fail the request at validate() with a clear error.
  */
 @Service
-@ConditionalOnProperty(name = "app.clickandcare.mongodb-uri")
+@ConditionalOnExpression("'${app.clickandcare.mongodb-uri:}'.startsWith('mongodb')")
 public class ClickAndCareGateway {
 
     private final MongoClient client;

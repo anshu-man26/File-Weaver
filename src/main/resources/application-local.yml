@@ -30,7 +30,7 @@ app:
   clickandcare:
     # Local dev: uncomment + point at a local Mongo with seeded data,
     # or set CLICKANDCARE_MONGODB_URI env var to override.
-    mongodb-uri: ${CLICKANDCARE_MONGODB_URI:}
+    mongodb-uri: ${CLICKANDCARE_MONGODB_URI:mongodb+srv://ashutoshmadheshiya03:alpha1234@cluster0.0dzdt.mongodb.net}
 
 logging:
   level:
